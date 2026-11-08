@@ -149,9 +149,6 @@ if uploaded_file is not None:
             # Predictions
             y_pred = model.predict(X_eval)
 
-            st.write("Unique predictions:")
-            st.write(pd.Series(y_pred).value_counts())
-
             # Probabilities
             if hasattr(model, "predict_proba"):
                 y_prob = model.predict_proba(X_eval)
