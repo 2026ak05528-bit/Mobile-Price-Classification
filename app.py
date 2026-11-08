@@ -1,160 +1,486 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
-import os
-from sklearn.preprocessing import StandardScaler
+import joblib
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, 
-    f1_score, matthews_corrcoef, roc_auc_score, 
-    confusion_matrix, classification_report
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    matthews_corrcoef,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
 )
 
-# Set page title and layout
-st.set_page_config(page_title="Model Evaluation Dashboard", layout="wide")
-
-st.title("📱 Mobile Price Class - Evaluation Dashboard")
-st.write("Upload your test dataset to evaluate and compare pre-trained machine learning models.")
-
 # -----------------------------------------------------------------------------
-# 1. SIDEBAR: Model Selection & File Upload
+# Page Configuration
 # -----------------------------------------------------------------------------
-st.sidebar.header("📁 Upload & Configuration")
-
-# Dataset upload option (CSV)
-uploaded_file = st.sidebar.file_uploader("Upload Test CSV File", type=["csv"])
-
-# Model selection dropdown
-model_option = st.sidebar.selectbox(
-    "Select ML Model",
-    (
-        "Logistic Regression",
-        "Decision Tree Classifier",
-        "K-Nearest Neighbor Classifier",
-        "Naive Bayes Classifier",
-        "Support Vector Machine"
-    )
+st.set_page_config(
+    page_title="Model Evaluation Dashboard",
+    layout="wide"
 )
 
-# Mapping human-readable names to saved model filenames
+st.title("📱 Mobile Price Classification Dashboard")
+st.markdown(
+    "Upload a test dataset and evaluate pre-trained machine learning models."
+)
+
+# -----------------------------------------------------------------------------
+# Model Files
+# -----------------------------------------------------------------------------
 MODEL_FILES = {
-    "Logistic Regression": "logistic_regression.pkl",
-    "Decision Tree Classifier": "decision_tree.pkl",
-    "K-Nearest Neighbor Classifier": "knn.pkl",
-    "Naive Bayes Classifier": "naive_bayes.pkl",
-    "Support Vector Machine": "svm.pkl"
+    "Logistic Regression": "models/logistic_regression.pkl",
+    "Decision Tree Classifier": "models/decision_tree.pkl",
+    "K-Nearest Neighbor Classifier": "models/knn.pkl",
+    "Naive Bayes Classifier": "models/naive_bayes.pkl",
+    "Support Vector Machine": "models/svm.pkl"
 }
 
 # -----------------------------------------------------------------------------
-# Helper Function: Load Models Safely
+# Helper Function
 # -----------------------------------------------------------------------------
 def load_model_artifact(filename):
-    """Loads a saved pickle file from the current directory."""
-    if os.path.exists(filename):
-        with open(filename, 'rb') as f:
-            return pickle.load(f)
-    return None
+    try:
+        return joblib.load(filename)
+    except Exception:
+        return None
+
 
 # -----------------------------------------------------------------------------
-# Main App Execution Logic
+# Upload Section
+# -----------------------------------------------------------------------------
+_, center_col, _ = st.columns([1, 2, 1])
+
+with center_col:
+    with st.container(border=True):
+
+        st.subheader("📁 Upload & Configuration")
+
+        uploaded_file = st.file_uploader(
+            "Upload Test CSV File",
+            type=["csv"]
+        )
+
+        selected_model = st.selectbox(
+            "Select ML Model",
+            list(MODEL_FILES.keys())
+        )
+
+# -----------------------------------------------------------------------------
+# Main App
 # -----------------------------------------------------------------------------
 if uploaded_file is not None:
-    # Read the uploaded test dataframe
-    df = pd.read_csv(uploaded_file)
-    
-    st.subheader("📊 Test Data Preview")
-    st.dataframe(df.head(), use_container_width=True)
-    
-    # Assuming 'price_range' is the target column based on the dataset structure
-    target_col = 'price_range'
-    
-    if target_col in df.columns:
-        # Separate features and target
+
+    try:
+        df = pd.read_csv(uploaded_file)
+
+        target_col = "price_range"
+
+        if target_col not in df.columns:
+            st.error(
+                f"❌ Target column '{target_col}' not found in uploaded dataset."
+            )
+            st.stop()
+
+        # ---------------------------------------------------------------------
+        # Tabs
+        # ---------------------------------------------------------------------
+        tab1, tab2, tab3 = st.tabs(
+            [
+                "📈 Evaluation Results",
+                "📋 Complete Dataset",
+                "📊 Model Comparison",
+            ]
+        )
+
+        # ---------------------------------------------------------------------
+        # Dataset Preparation
+        # ---------------------------------------------------------------------
         X_test = df.drop(columns=[target_col])
         y_test = df[target_col]
-        
-        # Load the corresponding model
-        model_filename = MODEL_FILES[model_option]
-        model = load_model_artifact(model_filename)
-        
-        if model is not None:
-            # Feature scaling setup (Applies to models requiring standardisation)
-            if model_option in ["Logistic Regression", "K-Nearest Neighbor Classifier", "Support Vector Machine"]:
-                scaler = load_model_artifact("scaler.pkl")
-                if scaler is not None:
-                    X_test_scaled = scaler.transform(X_test)
-                else:
-                    st.warning("⚠️ Scaler file (scaler.pkl) not found! Falling back to raw features.")
-                    X_test_scaled = X_test
-            else:
-                X_test_scaled = X_test  # Trees/Naive Bayes don't strictly require scaling
 
-            # Generate Predictions without retraining
-            y_pred = model.predict(X_test_scaled)
-            
-            # Extract probability distributions for AUC calculations
-            if hasattr(model, "predict_proba"):
-                y_prob = model.predict_proba(X_test_scaled)
+        # =====================================================================
+        # TAB 1 : MODEL EVALUATION
+        # =====================================================================
+        with tab1:
+
+            st.subheader("📈 Selected Model Evaluation")
+
+            model_filename = MODEL_FILES[selected_model]
+            model = load_model_artifact(model_filename)
+
+            if model is None:
+                st.error(
+                    f"❌ Could not load model file: {model_filename}"
+                )
+                st.stop()
+
+            # Scaling for selected models
+            if selected_model in [
+                "Logistic Regression",
+                "K-Nearest Neighbor Classifier",
+                "Support Vector Machine",
+            ]:
+
+                MODEL_SCALERS = {
+                    "Logistic Regression":"models/logistic_scaler.pkl",
+                    "Decision Tree Classifier":"models/decision_tree_scaler.pkl",
+                    "K-Nearest Neighbor Classifier":"models/knn_scaler.pkl",
+                    "Naive Bayes Classifier": "models/naive_bayes_scaler.pkl",
+                    "Support Vector Machine":"models/svm_scaler.pkl"
+                }
+                
+                scaler = load_model_artifact(MODEL_SCALERS[model_name])
+
+                if scaler is not None:
+                    X_eval = scaler.transform(X_test)
+                else:
+                    st.warning(
+                        "⚠️ scaler.pkl not found. Using raw features."
+                    )
+                    X_eval = X_test
+
             else:
-                # Fallback for models without native probability estimation
+                X_eval = X_test
+
+            # Predictions
+            y_pred = model.predict(X_eval)
+
+            # Probabilities
+            if hasattr(model, "predict_proba"):
+                y_prob = model.predict_proba(X_eval)
+            else:
                 y_prob = None
 
-            # -----------------------------------------------------------------
-            # c. Display of Evaluation Metrics
-            # -----------------------------------------------------------------
-            st.success(f"🎉 Analysis Complete for: *{model_option}*")
-            
-            st.subheader("📈 Multi-Class Performance Metrics")
-            
-            # Compute the 6 standard classification metrics
+            # Metrics
             acc = accuracy_score(y_test, y_pred)
-            prec = precision_score(y_test, y_pred, average='macro')
-            rec = recall_score(y_test, y_pred, average='macro')
-            f1 = f1_score(y_test, y_pred, average='macro')
-            mcc = matthews_corrcoef(y_test, y_pred)
-            
-            if y_prob is not None:
-                auc = roc_auc_score(y_test, y_prob, multi_class='ovr', average='macro')
-            else:
-                auc = "N/A"
 
-            # Create visual layout columns for the metrics
+            prec = precision_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            )
+
+            rec = recall_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            )
+
+            f1 = f1_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            )
+
+            mcc = matthews_corrcoef(
+                y_test,
+                y_pred
+            )
+
+            try:
+                if y_prob is not None:
+                    auc = roc_auc_score(
+                        y_test,
+                        y_prob,
+                        multi_class="ovr",
+                        average="macro",
+                    )
+                else:
+                    auc = None
+            except Exception:
+                auc = None
+
+            st.success(
+                f"🎉 Evaluation Complete for {selected_model}"
+            )
+
+            # Metric Cards
             col1, col2, col3 = st.columns(3)
-            col1.metric("Accuracy Score", f"{acc:.4f}")
-            col2.metric("AUC Score (OVR)", f"{auc:.4f}" if isinstance(auc, float) else auc)
-            col3.metric("Precision (Macro)", f"{prec:.4f}")
-            
+
+            col1.metric(
+                "Accuracy",
+                f"{acc:.4f}"
+            )
+
+            col2.metric(
+                "AUC",
+                f"{auc:.4f}" if auc is not None else "N/A"
+            )
+
+            col3.metric(
+                "Precision",
+                f"{prec:.4f}"
+            )
+
             col4, col5, col6 = st.columns(3)
-            col4.metric("Recall (Macro)", f"{rec:.4f}")
-            col5.metric("F1-Score (Macro)", f"{f1:.4f}")
-            col6.metric("Matthews Correlation (MCC)", f"{mcc:.4f}")
 
-            # -----------------------------------------------------------------
-            # d. Confusion Matrix & Classification Report
-            # -----------------------------------------------------------------
+            col4.metric(
+                "Recall",
+                f"{rec:.4f}"
+            )
+
+            col5.metric(
+                "F1 Score",
+                f"{f1:.4f}"
+            )
+
+            col6.metric(
+                "MCC",
+                f"{mcc:.4f}"
+            )
+
             st.markdown("---")
-            rep_col, cm_col = st.columns([1, 1])
-            
-            with rep_col:
-                st.subheader("📋 Classification Report")
-                report_dict = classification_report(y_test, y_pred, output_dict=True)
-                report_df = pd.DataFrame(report_dict).transpose()
-                st.dataframe(report_df.style.format(precision=4), use_container_width=True)
-                
-            with cm_col:
-                st.subheader("🧩 Confusion Matrix")
-                cm = confusion_matrix(y_test, y_pred)
-                # Display standard confusion matrix as a formatted dataframe
-                cm_df = pd.DataFrame(
-                    cm, 
-                    index=[f"Actual {i}" for i in range(cm.shape[0])],
-                    columns=[f"Predicted {i}" for i in range(cm.shape[1])]
-                )
-                st.dataframe(cm_df, use_container_width=True)
 
-        else:
-            st.error(f"❌ Missing artifact: Could not find pre-trained file {model_filename} in the working directory.")
-    else:
-        st.error(f"❌ Column schema failure: Target column {target_col} is missing from the uploaded file.")
+            report_col, cm_col = st.columns(2)
+
+            with report_col:
+
+                st.subheader("📋 Classification Report")
+
+                report_df = pd.DataFrame(
+                    classification_report(
+                        y_test,
+                        y_pred,
+                        output_dict=True,
+                        zero_division=0,
+                    )
+                ).transpose()
+
+                st.dataframe(
+                    report_df,
+                    use_container_width=True,
+                )
+
+            with cm_col:
+
+                st.subheader("🧩 Confusion Matrix")
+
+                cm = confusion_matrix(
+                    y_test,
+                    y_pred
+                )
+
+                cm_df = pd.DataFrame(
+                    cm,
+                    index=[
+                        f"Actual {i}"
+                        for i in range(cm.shape[0])
+                    ],
+                    columns=[
+                        f"Predicted {i}"
+                        for i in range(cm.shape[1])
+                    ],
+                )
+
+                st.dataframe(
+                    cm_df,
+                    use_container_width=True,
+                )
+
+        # =====================================================================
+        # TAB 2 : COMPLETE DATASET
+        # =====================================================================
+        with tab2:
+
+            st.subheader("📋 Complete Uploaded Dataset")
+
+            st.write(
+                f"Rows: {df.shape[0]} | Columns: {df.shape[1]}"
+            )
+
+            st.dataframe(
+                df,
+                use_container_width=True,
+                height=600,
+            )
+
+        # =====================================================================
+        # TAB 3 : MODEL COMPARISON
+        # =====================================================================
+        with tab3:
+
+            st.subheader("📊 Comparison of All Models")
+
+            comparison_results = []
+
+            for model_name, model_path in MODEL_FILES.items():
+
+                try:
+
+                    current_model = load_model_artifact(
+                        model_path
+                    )
+
+                    if current_model is None:
+                        continue
+
+                    # Scaling
+                    if model_name in [
+                        "Logistic Regression",
+                        "K-Nearest Neighbor Classifier",
+                        "Support Vector Machine",
+                    ]:
+
+                        scaler = load_model_artifact(
+                            "models/scaler.pkl"
+                        )
+
+                        if scaler is not None:
+                            X_model = scaler.transform(X_test)
+                        else:
+                            X_model = X_test
+
+                    else:
+                        X_model = X_test
+
+                    predictions = current_model.predict(
+                        X_model
+                    )
+
+                    accuracy = accuracy_score(
+                        y_test,
+                        predictions
+                    )
+
+                    precision = precision_score(
+                        y_test,
+                        predictions,
+                        average="macro",
+                        zero_division=0,
+                    )
+
+                    recall = recall_score(
+                        y_test,
+                        predictions,
+                        average="macro",
+                        zero_division=0,
+                    )
+
+                    f1score = f1_score(
+                        y_test,
+                        predictions,
+                        average="macro",
+                        zero_division=0,
+                    )
+
+                    mcc_score = matthews_corrcoef(
+                        y_test,
+                        predictions
+                    )
+
+                    auc_score = np.nan
+
+                    if hasattr(
+                        current_model,
+                        "predict_proba"
+                    ):
+
+                        try:
+
+                            probabilities = (
+                                current_model.predict_proba(
+                                    X_model
+                                )
+                            )
+
+                            auc_score = roc_auc_score(
+                                y_test,
+                                probabilities,
+                                multi_class="ovr",
+                                average="macro",
+                            )
+
+                        except Exception:
+                            pass
+
+                    comparison_results.append(
+                        {
+                            "Model": model_name,
+                            "Accuracy": round(
+                                accuracy, 4
+                            ),
+                            "Precision": round(
+                                precision, 4
+                            ),
+                            "Recall": round(
+                                recall, 4
+                            ),
+                            "F1 Score": round(
+                                f1score, 4
+                            ),
+                            "MCC": round(
+                                mcc_score, 4
+                            ),
+                            "AUC": (
+                                round(auc_score, 4)
+                                if not pd.isna(
+                                    auc_score
+                                )
+                                else "N/A"
+                            ),
+                        }
+                    )
+
+                except Exception as e:
+
+                    st.warning(
+                        f"Error evaluating {model_name}: {e}"
+                    )
+
+            comparison_df = pd.DataFrame(
+                comparison_results
+            )
+
+            st.write(model_name)
+
+            if hasattr(current_model, "n_features_in_"):
+                st.write(
+                    f"Model expects {current_model.n_features_in_} features"
+                )
+
+            st.write(
+                f"Dataset contains {X_test.shape[1]} features"
+            )
+
+            if not comparison_df.empty:
+
+                st.dataframe(
+                    comparison_df,
+                    use_container_width=True
+                )
+
+                numeric_df = comparison_df.copy()
+
+                numeric_df["Accuracy"] = pd.to_numeric(
+                    numeric_df["Accuracy"]
+                )
+
+                best_model = numeric_df.loc[
+                    numeric_df["Accuracy"].idxmax()
+                ]
+
+                st.success(
+                    f"""
+                    🏆 Best Performing Model: {best_model['Model']}
+                    
+                    Accuracy: {best_model['Accuracy']}
+                    """
+                )
+
+            else:
+                st.warning(
+                    "No models available for comparison."
+                )
+
+    except Exception as e:
+        st.error(f"❌ Error while processing file: {e}")
+
 else:
-    st.info("💡 Awaiting file submission. Drop your evaluation test CSV in the sidebar menu to begin.")
+    st.info(
+        "💡 Upload a test CSV file to begin evaluation."
+    )

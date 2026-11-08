@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import pickle
+import os
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.naive_bayes import GaussianNB
@@ -14,27 +17,10 @@ from sklearn.metrics import (
 
 # 1. Load the Dataset
 try:
-    df = pd.read_csv('train.csv')
+    df = pd.read_csv('test_data.csv')
     print("Dataset loaded successfully. Shape:", df.shape)
 except FileNotFoundError:
-    print("train.csv not found. Generating mock mobile dataset for demonstration...")
-    np.random.seed(42)
-    mock_data = {
-        'battery_power': np.random.randint(500, 2000, 2000),
-        'clock_speed': np.random.uniform(0.5, 3.0, 2000),
-        'fc': np.random.randint(0, 20, 2000),
-        'int_memory': np.random.randint(2, 64, 2000),
-        'pc': np.random.randint(0, 20, 2000),
-        'px_height': np.random.randint(0, 1900, 2000),
-        'px_width': np.random.randint(500, 2000, 2000),
-        'ram': np.random.randint(256, 4000, 2000),
-        'sc_h': np.random.randint(5, 20, 2000),
-        'sc_w': np.random.randint(0, 18, 2000),
-        'talk_time': np.random.randint(2, 21, 2000),
-    }
-    df = pd.DataFrame(mock_data)
-    score = df['ram'] * 2 + df['battery_power'] * 0.5 + df['px_height'] * 0.2
-    df['price_range'] = pd.qcut(score, q=4, labels=False).astype(int)
+    print("test_data.csv not found. Generating mock mobile dataset for demonstration...")
 
 # 2. Separate Features and Target
 X = df.drop('price_range', axis=1)
@@ -82,3 +68,10 @@ print(f"{'4. Recall (Weighted)':<32} | {recall:.4f}")
 print(f"{'5. F1 Score (Weighted)':<32} | {f1:.4f}")
 print(f"{'6. Matthews Correlation (MCC)':<32} | {mcc:.4f}")
 print("="*45)
+
+os.makedirs("models", exist_ok=True)
+
+joblib.dump(model, "models/naive_bayes.pkl")
+joblib.dump(scaler, "models/naive_bayes_scaler.pkl")
+
+print("Naive Bayes Model saved successfully.")
