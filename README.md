@@ -59,17 +59,9 @@ The goal is to predict the correct mobile phone price category using the above h
 
 C. GitHub Repository Link
 
-GitHub Repository
+GitHub Repository: https://github.com/2026ak05528-bit/Mobile-Price-Classification
 
-Plain Text
-https://github.com/2026ak05528-bit/Mobile-Price-Classification
-
-Live Streamlit App
-
-Plain Text
-https://your-app-link.streamlit.app
-
-Replace the Streamlit URL with your deployed application link.
+Live Streamlit App: https://mobile-price-classification-4wznyx7narxgjylfgvd99x.streamlit.app/
 
 ## Project Structure
 
