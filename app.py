@@ -119,8 +119,10 @@ if uploaded_file is not None:
             # Scaling for selected models
             if selected_model in [
                 "Logistic Regression",
+                "Decision Tree Classifier",
                 "K-Nearest Neighbor Classifier",
-                "Support Vector Machine",
+                "Naive Bayes Classifier",
+                "Support Vector Machine"
             ]:
 
                 MODEL_SCALERS = {
@@ -131,7 +133,7 @@ if uploaded_file is not None:
                     "Support Vector Machine":"models/svm_scaler.pkl"
                 }
                 
-                scaler = load_model_artifact(MODEL_SCALERS[model_name])
+                scaler = load_model_artifact(MODEL_SCALERS[selected_model])
 
                 if scaler is not None:
                     X_eval = scaler.transform(X_test)
@@ -146,6 +148,9 @@ if uploaded_file is not None:
 
             # Predictions
             y_pred = model.predict(X_eval)
+
+            st.write("Unique predictions:")
+            st.write(pd.Series(y_pred).value_counts())
 
             # Probabilities
             if hasattr(model, "predict_proba"):
@@ -322,12 +327,22 @@ if uploaded_file is not None:
                     # Scaling
                     if model_name in [
                         "Logistic Regression",
+                        "Decision Tree Classifier",
                         "K-Nearest Neighbor Classifier",
-                        "Support Vector Machine",
+                        "Naive Bayes Classifier",
+                        "Support Vector Machine"
                     ]:
 
+                        MODEL_SCALERS = {
+                            "Logistic Regression":"models/logistic_scaler.pkl",
+                            "Decision Tree Classifier":"models/decision_tree_scaler.pkl",
+                            "K-Nearest Neighbor Classifier":"models/knn_scaler.pkl",
+                            "Naive Bayes Classifier":"models/naive_bayes_scaler.pkl",
+                            "Support Vector Machine":"models/svm_scaler.pkl"
+                        }
+
                         scaler = load_model_artifact(
-                            "models/scaler.pkl"
+                            MODEL_SCALERS[model_name]
                         )
 
                         if scaler is not None:
@@ -436,16 +451,16 @@ if uploaded_file is not None:
                 comparison_results
             )
 
-            st.write(model_name)
+								
 
-            if hasattr(current_model, "n_features_in_"):
-                st.write(
-                    f"Model expects {current_model.n_features_in_} features"
-                )
+														
+						 
+																			
+				 
 
-            st.write(
-                f"Dataset contains {X_test.shape[1]} features"
-            )
+					 
+															  
+			 
 
             if not comparison_df.empty:
 
